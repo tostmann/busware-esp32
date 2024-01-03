@@ -15,11 +15,11 @@
       ]
     },
     {
-      "chipFamily": "ESP32-S3",
+      "chipFamily": "ESP32-S2",
       "improv": true,
       "parts": [
         {
-          "path": "https://install.busware.de/firmware/busware-eul-s3-serial-transparent.factory.bin",
+          "path": "https://install.busware.de/firmware/busware-eul-s2-serial-transparent.factory.bin",
           "offset": 0
         }
       ]

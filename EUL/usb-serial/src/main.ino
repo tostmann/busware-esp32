@@ -4,17 +4,33 @@
  */
 
 #include "version.h"
+#include <WiFi.h>
+
+#ifdef USE_IMPROV
+#include <ImprovWiFiLibrary.h>
+ImprovWiFi improvSerial(&Serial);
+#endif
 
 #define MYNAME "EUL"
 
-//String UniqueName = String(MYNAME) + "-" + WiFi.macAddress();
-String UniqueName = String(MYNAME);
+String UniqueName = String(MYNAME) + "-" + WiFi.macAddress();
+//String UniqueName = String(MYNAME);
 const char *uniquename = UniqueName.c_str();
 
-#define LED_BUILTIN D2
 #define MAXBUF 1024
-#define RF_RESET D1
-#define RF_TURBO D3
+#undef  LED_BUILTIN
+
+#ifdef BUSWARE_C3
+  #define LED_BUILTIN 4
+  #define RF_RESET 3
+  #define RF_TURBO 5
+#endif
+#ifdef BUSWARE_S2
+  #define LED_BUILTIN 2
+  #define RF_RESET 21
+  #define RF_TURBO 33
+#endif
+
 
 uint16_t inByte; // for reading from serial
 byte smlMessage[MAXBUF]; // for storing the the isolated message. 
@@ -29,8 +45,12 @@ void setup(void) {
     
     Serial.begin(19200);
     pinMode(LED_BUILTIN, OUTPUT);
-    
+
     Serial0.begin(460800);
+
+#ifdef USE_IMPROV
+    improvSerial.setDeviceInfo(ImprovTypes::ChipFamily::CF_ESP32_C3, UniqueName.c_str(), VERSION_SHORT, MYNAME);
+#endif
     
     delay(1000);
 
@@ -59,9 +79,14 @@ void loop() {
 
     av = Serial.available();
     if (av > 0) {
+
 	if (av > MAXBUF) av = MAXBUF;
 	Serial.readBytes( sbuf, av );
-	Serial0.write( sbuf, av ) ;
+
+#ifdef USE_IMPROV
+	if (!improvSerial.handleBuffer(sbuf, av) )
+#endif	
+	    Serial0.write( sbuf, av );
 	digitalWrite(LED_BUILTIN, HIGH);
 	previousMillis = currentMillis;
     }
@@ -90,3 +115,4 @@ void loop() {
 	digitalWrite(LED_BUILTIN, ledState);
     }
 }
+
