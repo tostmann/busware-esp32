@@ -19,7 +19,7 @@
       ]
     ],
     "mcu": "esp32s2",
-    "variant": "esp32s2"
+    "variant": "busware32s2"
   },
   "connectivity": [
     "wifi"

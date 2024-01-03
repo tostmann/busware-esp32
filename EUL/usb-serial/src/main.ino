@@ -20,15 +20,17 @@ const char *uniquename = UniqueName.c_str();
 #define MAXBUF 1024
 #undef  LED_BUILTIN
 
-#ifdef BUSWARE_C3
+#ifdef BUSWARE_EUL_C3
   #define LED_BUILTIN 4
   #define RF_RESET 3
   #define RF_TURBO 5
+  #define TCM Serial0
 #endif
-#ifdef BUSWARE_S2
+#ifdef BUSWARE_EUL_S2
   #define LED_BUILTIN 2
   #define RF_RESET 21
-  #define RF_TURBO 33
+//  #define RF_TURBO 33
+  #define TCM Serial1
 #endif
 
 
@@ -39,14 +41,18 @@ void setup(void) {
     
     pinMode(RF_RESET, OUTPUT);
     digitalWrite(RF_RESET, LOW);
-    
+
+#ifdef RF_TURBO
     pinMode(RF_TURBO, OUTPUT);
     digitalWrite(RF_TURBO, LOW);
+    TCM.begin(460800);
+#else    
+    TCM.begin(57600);
+#endif
     
     Serial.begin(19200);
     pinMode(LED_BUILTIN, OUTPUT);
 
-    Serial0.begin(460800);
 
 #ifdef USE_IMPROV
     improvSerial.setDeviceInfo(
@@ -92,15 +98,15 @@ void loop() {
 #ifdef USE_IMPROV
 	if (!improvSerial.handleBuffer(sbuf, av) )
 #endif	
-	    Serial0.write( sbuf, av );
+	    TCM.write( sbuf, av );
 	digitalWrite(LED_BUILTIN, HIGH);
 	previousMillis = currentMillis;
     }
 
-    av = Serial0.available();
+    av = TCM.available();
     if (av > 0) {
 	if (av > MAXBUF) av = MAXBUF;
-	Serial0.readBytes( sbuf, av );
+	TCM.readBytes( sbuf, av );
 	Serial.write( sbuf, av ) ;
 	digitalWrite(LED_BUILTIN, HIGH);
 	previousMillis = currentMillis;
