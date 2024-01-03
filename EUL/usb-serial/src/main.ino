@@ -49,7 +49,13 @@ void setup(void) {
     Serial0.begin(460800);
 
 #ifdef USE_IMPROV
-    improvSerial.setDeviceInfo(ImprovTypes::ChipFamily::CF_ESP32_C3, UniqueName.c_str(), VERSION_SHORT, MYNAME);
+    improvSerial.setDeviceInfo(
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+	ImprovTypes::ChipFamily::CF_ESP32_C3,
+#elif CONFIG_IDF_TARGET_ESP32S2
+	ImprovTypes::ChipFamily::CF_ESP32_S2,
+#endif	
+	UniqueName.c_str(), VERSION_SHORT, MYNAME);
 #endif
     
     delay(1000);
