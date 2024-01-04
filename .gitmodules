@@ -1,0 +1,3 @@
+[submodule "EUL/usb-serial/lib/Improv-WiFi-Library"]
+	path = EUL/usb-serial/lib/Improv-WiFi-Library
+	url = git@github.com:tostmann/Improv-WiFi-Library.git
