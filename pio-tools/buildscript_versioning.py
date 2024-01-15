@@ -15,7 +15,7 @@ except:
     with open(FILENAME_VERSION, 'w+') as f:
         f.write(version)
 
-version = 'v' + version + '.'
+version = 'v' + version + '+'
 build_no = 0
 
 try:
