@@ -11,12 +11,6 @@
 ImprovWiFi improvSerial(&Serial);
 #endif
 
-#define MYNAME "EUL"
-
-String UniqueName = String(MYNAME) + "-" + WiFi.macAddress();
-//String UniqueName = String(MYNAME);
-const char *uniquename = UniqueName.c_str();
-
 #define MAXBUF 1024
 #undef  LED_BUILTIN
 
@@ -25,22 +19,36 @@ const char *uniquename = UniqueName.c_str();
   #define RF_RESET 3
   #define RF_TURBO 5
   #define TCM Serial0
+  #define MYNAME "EUL"
 #endif
 #ifdef BUSWARE_EUL_S2
   #define LED_BUILTIN 2
   #define RF_RESET 21
-//  #define RF_TURBO 33
   #define TCM Serial1
+  #define MYNAME "EUL"
+#endif
+#ifdef BUSWARE_TUL_C3
+  #define LED_BUILTIN 4
+  #define TCM Serial0
+  #define MYNAME "TUL"
 #endif
 
+String UniqueName = String(MYNAME) + "-" + WiFi.macAddress();
+//String UniqueName = String(MYNAME);
+const char *uniquename = UniqueName.c_str();
 
 uint16_t inByte; // for reading from serial
 byte smlMessage[MAXBUF]; // for storing the the isolated message. 
 
 void setup(void) {
-    
+
+#ifdef BUSWARE_TUL_C3
+    TCM.begin(38400, SERIAL_8E1);;
+#else
+#ifdef RF_RESET    
     pinMode(RF_RESET, OUTPUT);
     digitalWrite(RF_RESET, LOW);
+#endif
 
 #ifdef RF_TURBO
     pinMode(RF_TURBO, OUTPUT);
@@ -49,10 +57,10 @@ void setup(void) {
 #else    
     TCM.begin(57600);
 #endif
+#endif
     
     Serial.begin(19200);
     pinMode(LED_BUILTIN, OUTPUT);
-
 
 #ifdef USE_IMPROV
     improvSerial.setDeviceInfo(
@@ -87,7 +95,9 @@ void loop() {
 
     unsigned long currentMillis = millis();
 
+#ifdef RF_RESET
     digitalWrite(RF_RESET, HIGH);
+#endif
 
     av = Serial.available();
     if (av > 0) {
