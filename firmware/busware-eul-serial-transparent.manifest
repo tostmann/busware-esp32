@@ -1,12 +1,11 @@
 {
-  "new_install_improv_wait_time": 10,
   "funding_url": "https://paypal.me/busware",
   "new_install_prompt_erase": true,
   "name": "USB-serial emulation for TCM515 (EUL)",
   "builds": [
     {
       "chipFamily": "ESP32-C3",
-      "improv": true,
+      "improv": false,
       "parts": [
         {
           "path": "https://install.busware.de/firmware/busware-eul-c3-serial-transparent.factory.bin",
@@ -16,7 +15,7 @@
     },
     {
       "chipFamily": "ESP32-S2",
-      "improv": true,
+      "improv": false,
       "parts": [
         {
           "path": "https://install.busware.de/firmware/busware-eul-s2-serial-transparent.factory.bin",

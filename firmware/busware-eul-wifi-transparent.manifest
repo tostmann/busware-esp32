@@ -1,14 +1,15 @@
 {
+  "new_install_improv_wait_time": 10,
   "funding_url": "https://paypal.me/busware",
   "new_install_prompt_erase": true,
-  "name": "USB-serial emulation for NCN5130 (TUL)",
+  "name": "WiFi-serial emulation for TCM515 (EUL)",
   "builds": [
     {
       "chipFamily": "ESP32-C3",
-      "improv": false,
+      "improv": true,
       "parts": [
         {
-          "path": "https://install.busware.de/firmware/busware-tul-c3-serial-transparent.factory.bin",
+          "path": "https://install.busware.de/firmware/busware-eul-c3-wifi-transparent.factory.bin",
           "offset": 0
         }
       ]

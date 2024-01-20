@@ -5,13 +5,18 @@
 
 #include "version.h"
 #include <WiFi.h>
+#include <nvs_flash.h>
 
 #ifdef USE_IMPROV
+#include <Preferences.h>
+Preferences prefs;
+
 #include <ImprovWiFiLibrary.h>
 ImprovWiFi improvSerial(&Serial);
 #endif
 
 #define MAXBUF 1024
+#define MAX_SRV_CLIENTS 1
 #undef  LED_BUILTIN
 
 #ifdef BUSWARE_EUL_C3
@@ -33,6 +38,12 @@ ImprovWiFi improvSerial(&Serial);
   #define MYNAME "TUL"
 #endif
 
+#ifdef TCP_SVR_PORT
+WiFiServer server(TCP_SVR_PORT); // TCP Port to listen on 
+WiFiClient serverClients[MAX_SRV_CLIENTS];
+bool Server_running = false;
+#endif
+
 String UniqueName = String(MYNAME) + "-" + WiFi.macAddress();
 //String UniqueName = String(MYNAME);
 const char *uniquename = UniqueName.c_str();
@@ -40,8 +51,17 @@ const char *uniquename = UniqueName.c_str();
 uint16_t inByte; // for reading from serial
 byte smlMessage[MAXBUF]; // for storing the the isolated message. 
 
-void setup(void) {
+#ifdef USE_IMPROV
+void onImprovWiFiConnectedCb(const char *ssid, const char *password) {
+    prefs.begin("credentials", false);
+    prefs.putString("ssid", ssid);
+    prefs.putString("password", password);
+    prefs.end();
+}
+#endif
 
+void setup(void) {
+    
 #ifdef BUSWARE_TUL_C3
     TCM.begin(38400, SERIAL_8E1);;
 #else
@@ -62,6 +82,7 @@ void setup(void) {
     Serial.begin(19200);
     pinMode(LED_BUILTIN, OUTPUT);
 
+    
 #ifdef USE_IMPROV
     improvSerial.setDeviceInfo(
 #ifdef CONFIG_IDF_TARGET_ESP32C3
@@ -70,16 +91,38 @@ void setup(void) {
 	ImprovTypes::ChipFamily::CF_ESP32_S2,
 #endif	
 	UniqueName.c_str(), VERSION_SHORT, MYNAME);
-#endif
-    
-    delay(1000);
 
+    improvSerial.onImprovConnected(onImprovWiFiConnectedCb);
+
+    prefs.begin("credentials", true);
+    String ssid     = prefs.getString("ssid", ""); 
+    String password = prefs.getString("password", "");
+    prefs.end();
+
+    if (ssid != "" && password != "")
+	improvSerial.tryConnectToWifi(ssid.c_str(), password.c_str()); 
+
+#endif
+
+   
     Serial.print( UniqueName );
     Serial.print(" - init succeed - running: ");
-    Serial.println( VERSION );
-    
-    delay(1000);
+    Serial.print( VERSION );
 
+#ifdef USE_IMPROV
+    if (improvSerial.isConnected()) {
+	Serial.print( " - " + WiFi.localIP().toString() );
+
+#ifdef TCP_SVR_PORT
+	Serial.print( ":" + String(TCP_SVR_PORT) );
+#endif    
+	
+    }
+    
+#endif
+    Serial.println();
+    
+    
 }
 
 unsigned long previousMillis = 0;
@@ -90,15 +133,74 @@ const long interval = 500;
 
 // the loop function runs over and over again forever
 void loop() {
-    uint8_t sbuf[MAXBUF];
+    uint8_t sbuf[MAXBUF], i;
     uint16_t av;
-
+    
     unsigned long currentMillis = millis();
-
+    
 #ifdef RF_RESET
     digitalWrite(RF_RESET, HIGH);
 #endif
-
+    
+#ifdef TCP_SVR_PORT
+    if (improvSerial.isConnected()) {
+	
+	if (!Server_running) {
+	    server.begin();
+	    server.setNoDelay(true);
+	    
+	    Server_running = true;
+        }
+	
+	//check if there are any new clients
+	if (server.hasClient()){
+	    for(i = 0; i < MAX_SRV_CLIENTS; i++){
+		//find free/disconnected spot
+		if (!serverClients[i] || !serverClients[i].connected()){
+		    if(serverClients[i]) serverClients[i].stop();
+		    serverClients[i] = server.available();
+		    break;
+		}
+	    }
+	    
+	    if (i >= MAX_SRV_CLIENTS) {
+		//no free/disconnected spot so reject
+		server.available().stop();
+	    }
+	}
+	//check clients for data
+	for(i = 0; i < MAX_SRV_CLIENTS; i++){
+	    if (serverClients[i] && serverClients[i].connected()){
+		av = serverClients[i].available();
+		if(av > 0 ){
+		    //get data from the telnet client and push it to the UART
+		    if (av > MAXBUF) av = MAXBUF;
+		    serverClients[i].readBytes( sbuf, av );
+		    TCM.write( sbuf, av ) ;
+		    digitalWrite(LED_BUILTIN, HIGH);
+		    previousMillis = currentMillis;
+		}
+	    }
+	    else {
+		if (serverClients[i]) {
+		    serverClients[i].stop();
+		}
+	    }
+	}
+    } else {
+//    Serial.println("WiFi not connected!");
+	for(i = 0; i < MAX_SRV_CLIENTS; i++) {
+	    if (serverClients[i]) serverClients[i].stop();
+	}
+    
+	if (Server_running) {
+	    server.end();
+	    Server_running = false;
+	}
+    }
+    
+#endif
+    
     av = Serial.available();
     if (av > 0) {
 
@@ -118,6 +220,15 @@ void loop() {
 	if (av > MAXBUF) av = MAXBUF;
 	TCM.readBytes( sbuf, av );
 	Serial.write( sbuf, av ) ;
+
+#ifdef TCP_SVR_PORT
+	for(i = 0; i < MAX_SRV_CLIENTS; i++){
+	    if (serverClients[i] && serverClients[i].connected()){
+		serverClients[i].write(sbuf, av);
+		delay(1);
+	    }
+	}
+#endif    
 	digitalWrite(LED_BUILTIN, HIGH);
 	previousMillis = currentMillis;
     }
