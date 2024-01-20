@@ -13,6 +13,16 @@
           "offset": 0
         }
       ]
+    },
+    {
+      "chipFamily": "ESP32-S2",
+      "improv": true,
+      "parts": [
+        {
+          "path": "https://install.busware.de/firmware/busware-eul-s2-wifi-transparent.factory.bin",
+          "offset": 0
+        }
+      ]
     }
   ]
 }
