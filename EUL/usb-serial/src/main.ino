@@ -42,6 +42,8 @@ ImprovWiFi improvSerial(&Serial);
 WiFiServer server(TCP_SVR_PORT); // TCP Port to listen on 
 WiFiClient serverClients[MAX_SRV_CLIENTS];
 bool Server_running = false;
+unsigned long previousConnect = 0;
+const long Reconnect_interval = 5000;
 #endif
 
 String UniqueName = String(MYNAME) + "-" + WiFi.macAddress();
@@ -94,14 +96,6 @@ void setup(void) {
 
     improvSerial.onImprovConnected(onImprovWiFiConnectedCb);
 
-    prefs.begin("credentials", true);
-    String ssid     = prefs.getString("ssid", ""); 
-    String password = prefs.getString("password", "");
-    prefs.end();
-
-    if (ssid != "" && password != "")
-	improvSerial.tryConnectToWifi(ssid.c_str(), password.c_str()); 
-
 #endif
 
    
@@ -109,23 +103,12 @@ void setup(void) {
     Serial.print(" - init succeed - running: ");
     Serial.print( VERSION );
 
-#ifdef USE_IMPROV
-    if (improvSerial.isConnected()) {
-	Serial.print( " - " + WiFi.localIP().toString() );
-
-#ifdef TCP_SVR_PORT
-	Serial.print( ":" + String(TCP_SVR_PORT) );
-#endif    
-	
-    }
-    
-#endif
     Serial.println();
     
     
 }
 
-unsigned long previousMillis = 0;
+unsigned long previousMillis  = 0;
 unsigned long ReqMillis = 0;
 
 int ledState = LOW;
@@ -146,11 +129,14 @@ void loop() {
     if (improvSerial.isConnected()) {
 	
 	if (!Server_running) {
+	    Serial.print( "Server listening @ " + WiFi.localIP().toString() );
+	    Serial.println( ":" + String(TCP_SVR_PORT) );
+	    
 	    server.begin();
 	    server.setNoDelay(true);
 	    
 	    Server_running = true;
-        }
+	}
 	
 	//check if there are any new clients
 	if (server.hasClient()){
@@ -188,15 +174,30 @@ void loop() {
 	    }
 	}
     } else {
-//    Serial.println("WiFi not connected!");
+	
+	
 	for(i = 0; i < MAX_SRV_CLIENTS; i++) {
 	    if (serverClients[i]) serverClients[i].stop();
 	}
-    
+	
 	if (Server_running) {
+	    Serial.println("WiFi disconnected!");
 	    server.end();
 	    Server_running = false;
 	}
+
+	if (currentMillis - previousConnect >= Reconnect_interval) {
+	    previousConnect = currentMillis;
+	    
+	    prefs.begin("credentials", true);
+	    String ssid     = prefs.getString("ssid", ""); 
+	    String password = prefs.getString("password", "");
+	    prefs.end();
+	    
+	    if (ssid != "" && password != "")
+		improvSerial.tryConnectToWifi(ssid.c_str(), password.c_str());
+	}
+	
     }
     
 #endif
@@ -210,7 +211,11 @@ void loop() {
 #ifdef USE_IMPROV
 	if (!improvSerial.handleBuffer(sbuf, av) )
 #endif	
-	    TCM.write( sbuf, av );
+#ifdef TCP_SVR_PORT
+	    delay(1);
+#else
+	TCM.write( sbuf, av );
+#endif	    
 	digitalWrite(LED_BUILTIN, HIGH);
 	previousMillis = currentMillis;
     }
@@ -219,7 +224,6 @@ void loop() {
     if (av > 0) {
 	if (av > MAXBUF) av = MAXBUF;
 	TCM.readBytes( sbuf, av );
-	Serial.write( sbuf, av ) ;
 
 #ifdef TCP_SVR_PORT
 	for(i = 0; i < MAX_SRV_CLIENTS; i++){
@@ -228,6 +232,8 @@ void loop() {
 		delay(1);
 	    }
 	}
+#else
+	Serial.write( sbuf, av ) ;
 #endif    
 	digitalWrite(LED_BUILTIN, HIGH);
 	previousMillis = currentMillis;
