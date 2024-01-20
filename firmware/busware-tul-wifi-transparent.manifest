@@ -2,7 +2,7 @@
   "new_install_improv_wait_time": 10,
   "funding_url": "https://paypal.me/busware",
   "new_install_prompt_erase": true,
-  "name": "WiFi-serial emulation for NCN5130 (TUL)",
+  "name": "WiFi-bridge for NCN5130 (TUL)",
   "builds": [
     {
       "chipFamily": "ESP32-C3",
