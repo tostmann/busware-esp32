@@ -44,6 +44,8 @@ String UniqueName = String(MYNAME) + "-" + WiFi.macAddress();
 //String UniqueName = String(MYNAME);
 const char *uniquename = UniqueName.c_str();
 
+uint32_t BytesIn  = 0; 
+uint32_t BytesOut = 0; 
 
 #ifdef TCP_SVR_PORT
 WiFiServer server(TCP_SVR_PORT); // TCP Port to listen on 
@@ -59,7 +61,7 @@ const long Reconnect_interval = 5000;
 AsyncWebServer webserver(80);
 
 void homepage(AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", UniqueName + " - Version: " + VERSION + "\n\nSSID: " + WiFi.SSID() + " RSSI: " + WiFi.RSSI() + "dBm uptime: " + String(millis()/1000)+ "sec\n\nTCP bridge active @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT) + "\n\n"  );
+    request->send(200, "text/plain", UniqueName + " - Version: " + VERSION + "\n\nSSID: " + WiFi.SSID() + " - RSSI: " + WiFi.RSSI() + "dBm - uptime: " + String(millis()/1000)+ "sec - Bytes in: " + String(BytesIn) + " out: " + String(BytesOut) + "\n\nTCP bridge active @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT) + "\n\n"  );
 }
 
 #endif
@@ -249,6 +251,7 @@ void loop() {
 		    if (av > MAXBUF) av = MAXBUF;
 		    serverClients[i].readBytes( sbuf, av );
 		    TCM.write( sbuf, av ) ;
+		    BytesIn += av;
 		    digitalWrite(LED_BUILTIN, HIGH);
 		    previousMillis = currentMillis;
 		}
@@ -293,28 +296,32 @@ void loop() {
     
 #endif
     
+#ifdef TCP_SVR_PORT
+#ifdef USE_IMPROV
+    improvSerial.handleSerial();
+#endif	
+#else
     av = Serial.available();
     if (av > 0) {
-
+	
 	if (av > MAXBUF) av = MAXBUF;
 	Serial.readBytes( sbuf, av );
-
+	BytesIn += av;
+	
 #ifdef USE_IMPROV
 	if (!improvSerial.handleBuffer(sbuf, av) )
 #endif	
-#ifdef TCP_SVR_PORT
-	    delay(1);
-#else
-	TCM.write( sbuf, av );
-#endif	    
+	    TCM.write( sbuf, av );
 	digitalWrite(LED_BUILTIN, HIGH);
 	previousMillis = currentMillis;
     }
+#endif
 
     av = TCM.available();
     if (av > 0) {
 	if (av > MAXBUF) av = MAXBUF;
 	TCM.readBytes( sbuf, av );
+	BytesOut += av;
 
 #ifdef TCP_SVR_PORT
 	for(i = 0; i < MAX_SRV_CLIENTS; i++){
