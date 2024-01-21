@@ -24,17 +24,20 @@ ImprovWiFi improvSerial(&Serial);
   #define RF_TURBO 5
   #define TCM Serial0
   #define MYNAME "EUL"
+  #define MDNS_SRV "tcm515"
 #endif
 #ifdef BUSWARE_EUL_S2
   #define LED_BUILTIN 2
   #define RF_RESET 21
   #define TCM Serial1
   #define MYNAME "EUL"
+  #define MDNS_SRV "tcm515"
 #endif
 #ifdef BUSWARE_TUL_C3
   #define LED_BUILTIN 4
   #define TCM Serial0
   #define MYNAME "TUL"
+  #define MDNS_SRV "ncn5130"
 #endif
 
 String UniqueName = String(MYNAME) + "-" + WiFi.macAddress();
@@ -51,6 +54,8 @@ const long Reconnect_interval = 5000;
 
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include <ESPmDNS.h>
+
 AsyncWebServer webserver(80);
 
 void homepage(AsyncWebServerRequest *request) {
@@ -139,8 +144,9 @@ void loop() {
 #endif
     
 #ifdef TCP_SVR_PORT
+    
     if (improvSerial.isConnected()) {
-	
+
 	if (!Server_running) {
 	    Serial.print( "Server listening @ " + WiFi.localIP().toString() );
 	    Serial.println( ":" + String(TCP_SVR_PORT) );
@@ -149,10 +155,14 @@ void loop() {
 	    server.setNoDelay(true);
 
 	    webserver.begin();
-	    
+
+	    MDNS.begin(uniquename);
+	    MDNS.addService( MDNS_SRV, "tcp", TCP_SVR_PORT);
+	    MDNS.addService( "http", "tcp", 80);
+
 	    Server_running = true;
 	}
-	
+
 	//check if there are any new clients
 	if (server.hasClient()){
 	    for(i = 0; i < MAX_SRV_CLIENTS; i++){
@@ -199,6 +209,7 @@ void loop() {
 	    Serial.println("WiFi disconnected!");
 	    server.end();
 	    webserver.end();
+	    MDNS.end();
 	    Server_running = false;
 	}
 
