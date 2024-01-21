@@ -59,7 +59,7 @@ const long Reconnect_interval = 5000;
 AsyncWebServer webserver(80);
 
 void homepage(AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", UniqueName + " - Version: " + VERSION + "\n\nTCP bridge active @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT) + "\n\n"  );
+    request->send(200, "text/plain", UniqueName + " - Version: " + VERSION + "\n\nSSID: " + WiFi.SSID() + " RSSI: " + WiFi.RSSI() + "dBm uptime: " + String(millis()/1000)+ "sec\n\nTCP bridge active @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT) + "\n\n"  );
 }
 
 #endif
