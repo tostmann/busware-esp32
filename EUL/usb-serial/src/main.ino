@@ -5,7 +5,6 @@
 
 #include "version.h"
 #include <WiFi.h>
-#include <nvs_flash.h>
 
 #ifdef USE_IMPROV
 #include <Preferences.h>
@@ -38,17 +37,27 @@ ImprovWiFi improvSerial(&Serial);
   #define MYNAME "TUL"
 #endif
 
+String UniqueName = String(MYNAME) + "-" + WiFi.macAddress();
+//String UniqueName = String(MYNAME);
+const char *uniquename = UniqueName.c_str();
+
+
 #ifdef TCP_SVR_PORT
 WiFiServer server(TCP_SVR_PORT); // TCP Port to listen on 
 WiFiClient serverClients[MAX_SRV_CLIENTS];
 bool Server_running = false;
 unsigned long previousConnect = 0;
 const long Reconnect_interval = 5000;
-#endif
 
-String UniqueName = String(MYNAME) + "-" + WiFi.macAddress();
-//String UniqueName = String(MYNAME);
-const char *uniquename = UniqueName.c_str();
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+AsyncWebServer webserver(80);
+
+void homepage(AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", UniqueName + " - Version: " + VERSION + "\n\nTCP bridge active @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT) + "\n\n"  );
+}
+
+#endif
 
 uint16_t inByte; // for reading from serial
 byte smlMessage[MAXBUF]; // for storing the the isolated message. 
@@ -95,7 +104,11 @@ void setup(void) {
 	UniqueName.c_str(), VERSION_SHORT, MYNAME);
 
     improvSerial.onImprovConnected(onImprovWiFiConnectedCb);
+#endif
 
+#ifdef TCP_SVR_PORT
+    webserver.on("/", HTTP_GET, homepage);    
+    webserver.onNotFound(homepage);
 #endif
 
    
@@ -134,6 +147,8 @@ void loop() {
 	    
 	    server.begin();
 	    server.setNoDelay(true);
+
+	    webserver.begin();
 	    
 	    Server_running = true;
 	}
@@ -183,6 +198,7 @@ void loop() {
 	if (Server_running) {
 	    Serial.println("WiFi disconnected!");
 	    server.end();
+	    webserver.end();
 	    Server_running = false;
 	}
 
