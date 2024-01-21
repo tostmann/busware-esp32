@@ -74,6 +74,64 @@ void onImprovWiFiConnectedCb(const char *ssid, const char *password) {
     prefs.putString("password", password);
     prefs.end();
 }
+
+bool ImprovWiFiTryConnect(const char *ssid, const char *password) {
+    uint8_t count = 0;
+    int bestNetworkDb = INT_MIN;
+    uint8_t bestBSSID[6];
+    int32_t bestChannel = 0;
+    bool known = false;
+        
+    if (WiFi.isConnected()) {
+	WiFi.disconnect();
+	delay(100);
+    }
+
+    int networkNum = WiFi.scanNetworks(false, false); // Wait for scan result, hide hidden
+
+    if (networkNum==0)
+	networkNum = WiFi.scanNetworks(false, false); 
+    
+    if (networkNum<=0)
+	return false;
+
+    for(int32_t i = 0; i < networkNum; ++i) {
+	
+	String ssid_scan;
+	int32_t rssi_scan;
+	uint8_t sec_scan;
+	uint8_t* BSSID_scan;
+	int32_t chan_scan;
+	
+	WiFi.getNetworkInfo(i, ssid_scan, sec_scan, rssi_scan, BSSID_scan, chan_scan);
+
+	if (String(ssid) == ssid_scan) {
+	    if(rssi_scan > bestNetworkDb) {
+		known = true;
+		bestNetworkDb = rssi_scan;
+		bestChannel   = chan_scan;
+		memcpy((void*) &bestBSSID, (void*) BSSID_scan, sizeof(bestBSSID));
+	    }
+	}
+	
+    }
+
+    if (!known) 
+	return false;
+    
+    WiFi.begin( ssid, password, bestChannel, bestBSSID);
+    
+    while (!WiFi.isConnected()) {
+	delay(DELAY_MS_WAIT_WIFI_CONNECTION);
+	if (count > MAX_ATTEMPTS_WIFI_CONNECTION) {
+	    WiFi.disconnect();
+	    return false;
+	}
+	count++;
+    }
+    
+    return true;
+}
 #endif
 
 void setup(void) {
@@ -109,6 +167,7 @@ void setup(void) {
 	UniqueName.c_str(), VERSION_SHORT, MYNAME);
 
     improvSerial.onImprovConnected(onImprovWiFiConnectedCb);
+    improvSerial.setCustomConnectWiFi(ImprovWiFiTryConnect);
 #endif
 
 #ifdef TCP_SVR_PORT
@@ -146,6 +205,8 @@ void loop() {
 #ifdef TCP_SVR_PORT
     
     if (improvSerial.isConnected()) {
+
+	previousConnect = currentMillis;
 
 	if (!Server_running) {
 	    Serial.print( "Server listening @ " + WiFi.localIP().toString() );
@@ -198,6 +259,7 @@ void loop() {
 		}
 	    }
 	}
+
     } else {
 	
 	
@@ -214,7 +276,6 @@ void loop() {
 	}
 
 	if (currentMillis - previousConnect >= Reconnect_interval) {
-	    previousConnect = currentMillis;
 	    
 	    prefs.begin("credentials", true);
 	    String ssid     = prefs.getString("ssid", ""); 
@@ -222,7 +283,10 @@ void loop() {
 	    prefs.end();
 	    
 	    if (ssid != "" && password != "")
-		improvSerial.tryConnectToWifi(ssid.c_str(), password.c_str());
+		ImprovWiFiTryConnect(ssid.c_str(), password.c_str());
+
+	    previousConnect = currentMillis;
+
 	}
 	
     }
