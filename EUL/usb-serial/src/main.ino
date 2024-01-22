@@ -40,10 +40,6 @@ ImprovWiFi improvSerial(&Serial);
   #define MDNS_SRV "ncn5130"
 #endif
 
-String UniqueName = String(MYNAME) + "-" + WiFi.macAddress();
-//String UniqueName = String(MYNAME);
-const char *uniquename = UniqueName.c_str();
-
 uint32_t BytesIn  = 0; 
 uint32_t BytesOut = 0; 
 
@@ -61,7 +57,7 @@ const long Reconnect_interval = 5000;
 AsyncWebServer webserver(80);
 
 void homepage(AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", UniqueName + " - Version: " + VERSION + "\n\nSSID: " + WiFi.SSID() + " - RSSI: " + WiFi.RSSI() + "dBm - uptime: " + String(millis()/1000)+ "sec - Bytes in: " + String(BytesIn) + " out: " + String(BytesOut) + "\n\nTCP bridge active @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT) + "\n\n"  );
+    request->send(200, "text/plain", String( WiFi.getHostname() ) + " - Version: " + VERSION + "\n\nSSID: " + WiFi.SSID() + " - RSSI: " + WiFi.RSSI() + "dBm - uptime: " + String(millis()/1000)+ "sec - Bytes in: " + String(BytesIn) + " out: " + String(BytesOut) + "\n\nTCP bridge active @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT) + "\n\n"  );
 }
 
 #endif
@@ -137,6 +133,11 @@ bool ImprovWiFiTryConnect(const char *ssid, const char *password) {
 #endif
 
 void setup(void) {
+
+    String UniqueName = String(MYNAME) + "-" + WiFi.macAddress();
+    UniqueName.replace( ":", "" );				   
+    WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
+    WiFi.setHostname( UniqueName.c_str() );
     
 #ifdef BUSWARE_TUL_C3
     TCM.begin(38400, SERIAL_8E1);;
@@ -166,7 +167,7 @@ void setup(void) {
 #elif CONFIG_IDF_TARGET_ESP32S2
 	ImprovTypes::ChipFamily::CF_ESP32_S2,
 #endif	
-	UniqueName.c_str(), VERSION_SHORT, MYNAME);
+	WiFi.getHostname(), VERSION_SHORT, MYNAME);
 
     improvSerial.onImprovConnected(onImprovWiFiConnectedCb);
     improvSerial.setCustomConnectWiFi(ImprovWiFiTryConnect);
@@ -178,7 +179,7 @@ void setup(void) {
 #endif
 
    
-    Serial.print( UniqueName );
+    Serial.print( WiFi.getHostname() );
     Serial.print(" - init succeed - running: ");
     Serial.print( VERSION );
 
@@ -219,7 +220,7 @@ void loop() {
 
 	    webserver.begin();
 
-	    MDNS.begin(uniquename);
+	    MDNS.begin(WiFi.getHostname());
 	    MDNS.addService( MDNS_SRV, "tcp", TCP_SVR_PORT);
 	    MDNS.addService( "http", "tcp", 80);
 
