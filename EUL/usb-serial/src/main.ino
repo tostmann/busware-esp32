@@ -16,28 +16,39 @@ ImprovWiFi improvSerial(&Serial);
 
 #define MAXBUF 1024
 #define MAX_SRV_CLIENTS 1
-#undef  LED_BUILTIN
 
-#ifdef BUSWARE_EUL_C3
-  #define LED_BUILTIN 4
-  #define RF_RESET 3
-  #define RF_TURBO 5
-  #define TCM Serial0
-  #define MYNAME "EUL"
-  #define MDNS_SRV "tcm515"
+// main definitions:
+#if defined(BUSWARE_EUL)
+
+#define MDNS_SRV "tcm515"
+#define MYNAME "EUL"
+
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+#define RF_RESET 3
+#define RF_TURBO 5
+#define TCM Serial0
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+#undef  LED_BUILTIN
+#define LED_BUILTIN 2
+#define RF_RESET 21
+#define TCM Serial1
 #endif
-#ifdef BUSWARE_EUL_S2
-  #define LED_BUILTIN 2
-  #define RF_RESET 21
-  #define TCM Serial1
-  #define MYNAME "EUL"
-  #define MDNS_SRV "tcm515"
-#endif
-#ifdef BUSWARE_TUL_C3
-  #define LED_BUILTIN 4
-  #define TCM Serial0
-  #define MYNAME "TUL"
-  #define MDNS_SRV "ncn5130"
+
+#elif defined(BUSWARE_TUL)
+
+#define TCM Serial0
+#define MYNAME "TUL"
+#define MDNS_SRV "ncn5130"
+
+#elif defined(BUSWARE_CUN)
+#define TCM Serial0
+#define MYNAME "CUN"
+#define MDNS_SRV "culfw"
+
+#else
+
+#error "No matching gadget"
+
 #endif
 
 uint32_t BytesIn  = 0; 
@@ -138,10 +149,15 @@ void setup(void) {
     UniqueName.replace( ":", "" );				   
     WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
     WiFi.setHostname( UniqueName.c_str() );
-    
-#ifdef BUSWARE_TUL_C3
+
+#if defined(BUSWARE_CUN)
+    TCM.begin(38400, SERIAL_8N1);;
+
+#elif defined(BUSWARE_TUL)
     TCM.begin(38400, SERIAL_8E1);;
-#else
+
+#elif defined(BUSWARE_EUL)
+
 #ifdef RF_RESET    
     pinMode(RF_RESET, OUTPUT);
     digitalWrite(RF_RESET, LOW);
@@ -154,6 +170,7 @@ void setup(void) {
 #else    
     TCM.begin(57600);
 #endif
+
 #endif
     
     Serial.begin(19200);
@@ -162,9 +179,9 @@ void setup(void) {
     
 #ifdef USE_IMPROV
     improvSerial.setDeviceInfo(
-#ifdef CONFIG_IDF_TARGET_ESP32C3
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
 	ImprovTypes::ChipFamily::CF_ESP32_C3,
-#elif CONFIG_IDF_TARGET_ESP32S2
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
 	ImprovTypes::ChipFamily::CF_ESP32_S2,
 #endif	
 	WiFi.getHostname(), VERSION_SHORT, MYNAME);
@@ -341,15 +358,12 @@ void loop() {
     // LED blinking
     if (currentMillis - previousMillis >= interval) {
 	previousMillis = currentMillis;
-
-	if (0) {
+	
+	if (ledState == HIGH)
 	    ledState = LOW;
-	} else {
-	    if (ledState == HIGH)
-		ledState = LOW;
-	    else
-		ledState = HIGH;
-	}
+	else
+	    ledState = HIGH;
+	
 	digitalWrite(LED_BUILTIN, ledState);
     }
 }
