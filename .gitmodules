@@ -4,3 +4,9 @@
 [submodule "IRH/usb-serial-packet/lib/Improv-WiFi-Library"]
 	path = IRH/usb-serial-packet/lib/Improv-WiFi-Library
 	url = git@github.com:tostmann/Improv-WiFi-Library.git
+[submodule "CUN/AVRISP/lib/Improv-WiFi-Library"]
+	path = CUN/AVRISP/lib/Improv-WiFi-Library
+	url = git@github.com:tostmann/Improv-WiFi-Library.git
+[submodule "CUN/AVRISP/lib/ESP_AVRISP"]
+	path = CUN/AVRISP/lib/ESP_AVRISP
+	url = git@github.com:tostmann/ESP_AVRISP.git
