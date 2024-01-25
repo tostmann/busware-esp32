@@ -9,7 +9,7 @@
       "improv": true,
       "parts": [
         {
-          "path": "https://install.busware.de/firmware/busware-cun-avrisp.factory.bin",
+          "path": "https://install.busware.de/firmware/busware-cun-c3-avrisp.factory.bin",
           "offset": 0
         }
       ]
