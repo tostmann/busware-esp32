@@ -1,0 +1,18 @@
+{
+  "new_install_improv_wait_time": 10,
+  "funding_url": "https://paypal.me/busware",
+  "new_install_prompt_erase": true,
+  "name": "AVRISP OTA Flash tool for CUN",
+  "builds": [
+    {
+      "chipFamily": "ESP32-C3",
+      "improv": true,
+      "parts": [
+        {
+          "path": "https://install.busware.de/firmware/busware-cun-avrisp.factory.bin",
+          "offset": 0
+        }
+      ]
+    }
+  ]
+}
