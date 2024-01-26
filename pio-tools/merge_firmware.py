@@ -1,10 +1,12 @@
 Import("env")
+import shutil
 
 #print(env.Dump())
 
 APP_BIN = "$BUILD_DIR/${PROGNAME}.bin"
 #MERGED_BIN = "$BUILD_DIR/${PROGNAME}.factory.bin"
 MERGED_BIN = "/share/GIT/busware-esp32/firmware/${PIOENV}.factory.bin"
+OTA_BIN = "/share/GIT/busware-esp32/firmware/${PIOENV}.ota.bin"
 BOARD_CONFIG = env.BoardConfig()
 
 
@@ -31,8 +33,19 @@ def merge_bin(source, target, env):
         )
     )
 
+def bin_map_copy(source, target, env):
+    env.Execute(
+        " ".join(
+            [
+                "cp",
+                APP_BIN,
+                OTA_BIN
+            ]
+        )
+    )
 # Add a post action that runs esptoolpy to merge available flash images
-env.AddPostAction(APP_BIN , merge_bin)
+env.AddPostAction(APP_BIN, merge_bin)
+env.AddPostAction(APP_BIN, bin_map_copy)
 
 # Patch the upload command to flash the merged binary at address 0x0
 env.Replace(
