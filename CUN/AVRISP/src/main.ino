@@ -30,12 +30,16 @@ const long interval = 500;
 AsyncWebServer webserver(80);
 
 void homepage(AsyncWebServerRequest *request) {
-    request->send(200, "text/html", "<h2>" + String( WiFi.getHostname() ) + " - Version: " + VERSION + "</h2>SSID: " + WiFi.SSID() + " - RSSI: " + WiFi.RSSI() + "dBm - uptime: " + String(millis()/1000)+ "sec<br><br><br><br>Use your avrdude:<br><br><b>avrdude -c arduino -p m328pb -P net:" + WiFi.localIP().toString() + ":" + String(port) + " -e -U flash:w:nanoCUL.hex -U lfuse:w:0xe2:m -U hfuse:w:0xd1:m</b><br><br><br><a href=\"/update?z=" + String(millis()) + "\">update firmware</a>\n"  );
+    request->send(200, "text/plain", String( WiFi.getHostname() ) + " - Version: " + VERSION + "\n\nSSID: " + WiFi.SSID() + " - RSSI: " + WiFi.RSSI() + "dBm - uptime: " + String(millis()/1000)+ "sec\n\n\nUse your avrdude:\n\navrdude -c arduino -p m328pb -P net:" + WiFi.localIP().toString() + ":" + String(port) + " -e -U flash:w:nanoCUL.hex -U lfuse:w:0xe2:m -U hfuse:w:0xd1:m\n\n"  );    
 }
 
 #ifdef OTA_URL
 void webupdate(AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", "OTA update from " + String(OTA_URL) + " started ...\n\nsee serial console for details" );
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", "OTA update from " + String(OTA_URL) + " started ...\n\nsee serial console for details" );
+    response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    response->addHeader("Pragma", "no-cache");
+    response->addHeader("Expires", "0");
+    request->send(response);
     request_update = true;
 }
 #endif
@@ -136,7 +140,7 @@ void setup() {
 
     webserver.on("/", HTTP_GET, homepage);
 
-#ifdef webupdate    
+#ifdef OTA_URL    
     webserver.on("/update", HTTP_GET, webupdate);    
 #endif
     webserver.onNotFound(homepage);
@@ -155,7 +159,7 @@ void loop() {
 
 	previousConnect = currentMillis;
 
-#ifdef webupdate    
+#ifdef OTA_URL
 	if (request_update) {
 	    firmwareUpdate();
 	    request_update = false;
@@ -170,21 +174,30 @@ void loop() {
 	    MDNS.begin(WiFi.getHostname());
 	    MDNS.addService("avrisp", "tcp", port);
 	    webserver.begin();
-	    
+
+	    IPAddress local_ip = WiFi.localIP();
+
 	    Serial.print("WiFi connected: ");
 	    Serial.print(WiFi.SSID());
-	    Serial.print(" ");
-	    Serial.println(WiFi.RSSI());
-	    
-	    IPAddress local_ip = WiFi.localIP();
-	    Serial.print("IP address: ");
+	    Serial.print(" - ");
+	    Serial.print(WiFi.RSSI());
+	    Serial.print("dBm - IP address: ");
 	    Serial.println(local_ip);
-	    Serial.println("Use your avrdude:");
+
+#ifdef OTA_URL
+	    Serial.print("This firmware supports OTA updates, by calling: http://");
+	    Serial.print(local_ip);
+	    Serial.println("/update?t=99");
+#else	    
+	    Serial.println("No OTA support");
+#endif
+	    
+	    Serial.println("\nUse your avrdude:");
 	    Serial.print("avrdude -c arduino -p m328pb -P net:");
 	    Serial.print(local_ip);
 	    Serial.print(":");
 	    Serial.print(port);
-	    Serial.println(" -e -U flash:w:nanoCUL.hex -U lfuse:w:0xe2:m -U hfuse:w:0xd1:m");
+	    Serial.println(" -e -U flash:w:nanoCUL.hex -U lfuse:w:0xe2:m -U hfuse:w:0xd1:m\n");
 
 	    Server_running = true;
 	}
