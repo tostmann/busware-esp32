@@ -5,6 +5,8 @@
 #include <WiFi.h>
 #include <ESPmDNS.h>
 
+#include "updateOTA.h"
+
 #define MYNAME "CUN-AVRISP"
 
 #include <Preferences.h>
@@ -17,6 +19,7 @@ const uint16_t port = 328;
 const uint8_t  reset_pin = 2;
 const uint32_t connectTimeoutMs = 10000;
 bool Server_running = false;
+bool request_update = false;
 unsigned long previousMillis  = 0;
 int ledState = LOW;
 const long interval = 500;
@@ -27,8 +30,16 @@ const long interval = 500;
 AsyncWebServer webserver(80);
 
 void homepage(AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", String( WiFi.getHostname() ) + " - Version: " + VERSION + "\n\nSSID: " + WiFi.SSID() + " - RSSI: " + WiFi.RSSI() + "dBm - uptime: " + String(millis()/1000)+ "sec\n\n\nUse your avrdude:\n\navrdude -c arduino -p m328pb -P net:" + WiFi.localIP().toString() + ":" + String(port) + " -e -U flash:w:nanoCUL.hex -U lfuse:w:0xe2:m -U hfuse:w:0xd1:m\n\n"  );
+    request->send(200, "text/html", "<h2>" + String( WiFi.getHostname() ) + " - Version: " + VERSION + "</h2>SSID: " + WiFi.SSID() + " - RSSI: " + WiFi.RSSI() + "dBm - uptime: " + String(millis()/1000)+ "sec<br><br><br><br>Use your avrdude:<br><br><b>avrdude -c arduino -p m328pb -P net:" + WiFi.localIP().toString() + ":" + String(port) + " -e -U flash:w:nanoCUL.hex -U lfuse:w:0xe2:m -U hfuse:w:0xd1:m</b><br><br><br><a href=\"/update?z=" + String(millis()) + "\">update firmware</a>\n"  );
 }
+
+#ifdef OTA_URL
+void webupdate(AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", "OTA update from " + String(OTA_URL) + " started ...\n\nsee serial console for details" );
+    request_update = true;
+}
+#endif
+
 void onImprovWiFiConnectedCb(const char *ssid, const char *password) {
     prefs.begin("credentials", false);
     prefs.putString("ssid", ssid);
@@ -123,7 +134,11 @@ void setup() {
     Serial.print(" - init succeed - running: ");
     Serial.println( VERSION );
 
-    webserver.on("/", HTTP_GET, homepage);    
+    webserver.on("/", HTTP_GET, homepage);
+
+#ifdef webupdate    
+    webserver.on("/update", HTTP_GET, webupdate);    
+#endif
     webserver.onNotFound(homepage);
 
 }
@@ -140,6 +155,13 @@ void loop() {
 
 	previousConnect = currentMillis;
 
+#ifdef webupdate    
+	if (request_update) {
+	    firmwareUpdate();
+	    request_update = false;
+	}
+#endif
+	
 	if (!Server_running) {
 	    // listen for avrdudes
 	    avrprog.begin();
@@ -163,7 +185,7 @@ void loop() {
 	    Serial.print(":");
 	    Serial.print(port);
 	    Serial.println(" -e -U flash:w:nanoCUL.hex -U lfuse:w:0xe2:m -U hfuse:w:0xd1:m");
-	    
+
 	    Server_running = true;
 	}
 	
