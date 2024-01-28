@@ -9,6 +9,8 @@
 
 #define MYNAME "CUN-AVRISP"
 
+// https://www.pcbway.com/project/shareproject/AVR_SD_Hex_Loader_v1_4.html
+
 #include <Preferences.h>
 Preferences prefs;
 

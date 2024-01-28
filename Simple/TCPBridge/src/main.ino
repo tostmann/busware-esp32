@@ -4,15 +4,16 @@
  */
 
 #include "version.h"
+#include "busware.h"
 #include <WiFi.h>
 
-#ifdef USE_IMPROV
+#include "updateOTA.h"
+
 #include <Preferences.h>
 Preferences prefs;
 
 #include <ImprovWiFiLibrary.h>
 ImprovWiFi improvSerial(&Serial);
-#endif
 
 #define MAXBUF 1024
 #define MAX_SRV_CLIENTS 1
@@ -24,24 +25,22 @@ ImprovWiFi improvSerial(&Serial);
 #define MYNAME "EUL"
 
 #if defined(CONFIG_IDF_TARGET_ESP32C3)
-#define RF_RESET 3
-#define RF_TURBO 5
-#define TCM Serial0
+TCMTransceiver Transceiver(&Serial0, 3, 5);
 #elif defined(CONFIG_IDF_TARGET_ESP32S2)
-#undef  LED_BUILTIN
-#define LED_BUILTIN 2
-#define RF_RESET 21
-#define TCM Serial1
+TCMTransceiver Transceiver(&Serial1, 21);
 #endif
 
 #elif defined(BUSWARE_TUL)
 
-#define TCM Serial0
+TPUARTTransceiver Transceiver(&Serial0);
+
 #define MYNAME "TUL"
 #define MDNS_SRV "ncn5130"
 
 #elif defined(BUSWARE_CUN)
-#define TCM Serial0
+
+CSMTransceiver Transceiver(&Serial0, 2);
+
 #define MYNAME "CUN"
 #define MDNS_SRV "culfw"
 
@@ -52,14 +51,18 @@ ImprovWiFi improvSerial(&Serial);
 #endif
 
 uint32_t BytesIn  = 0; 
-uint32_t BytesOut = 0; 
+uint32_t BytesOut = 0;
 
-#ifdef TCP_SVR_PORT
+#ifndef TCP_SVR_PORT
+#error need TCP_SVR_PORT definition
+#endif
+
 WiFiServer server(TCP_SVR_PORT); // TCP Port to listen on 
 WiFiClient serverClients[MAX_SRV_CLIENTS];
 bool Server_running = false;
 unsigned long previousConnect = 0;
 const long Reconnect_interval = 5000;
+bool request_update = false;
 
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
@@ -71,12 +74,20 @@ void homepage(AsyncWebServerRequest *request) {
     request->send(200, "text/plain", String( WiFi.getHostname() ) + " - Version: " + VERSION + "\n\nSSID: " + WiFi.SSID() + " - RSSI: " + WiFi.RSSI() + "dBm - uptime: " + String(millis()/1000)+ "sec - Bytes in: " + String(BytesIn) + " out: " + String(BytesOut) + "\n\nTCP bridge active @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT) + "\n\n"  );
 }
 
+#ifdef OTA_URL
+void webupdate(AsyncWebServerRequest *request) {
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", "OTA update from " + String(OTA_URL) + " started ...\n\nsee serial console for details" );
+    response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    response->addHeader("Pragma", "no-cache");
+    response->addHeader("Expires", "0");
+    request->send(response);
+    request_update = true;
+}
 #endif
 
 uint16_t inByte; // for reading from serial
 byte smlMessage[MAXBUF]; // for storing the the isolated message. 
 
-#ifdef USE_IMPROV
 void onImprovWiFiConnectedCb(const char *ssid, const char *password) {
     prefs.begin("credentials", false);
     prefs.putString("ssid", ssid);
@@ -141,7 +152,6 @@ bool ImprovWiFiTryConnect(const char *ssid, const char *password) {
     
     return true;
 }
-#endif
 
 void setup(void) {
 
@@ -150,34 +160,12 @@ void setup(void) {
     WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
     WiFi.setHostname( UniqueName.c_str() );
 
-#if defined(BUSWARE_CUN)
-    TCM.begin(38400, SERIAL_8N1);;
-
-#elif defined(BUSWARE_TUL)
-    TCM.begin(38400, SERIAL_8E1);;
-
-#elif defined(BUSWARE_EUL)
-
-#ifdef RF_RESET    
-    pinMode(RF_RESET, OUTPUT);
-    digitalWrite(RF_RESET, LOW);
-#endif
-
-#ifdef RF_TURBO
-    pinMode(RF_TURBO, OUTPUT);
-    digitalWrite(RF_TURBO, LOW);
-    TCM.begin(460800);
-#else    
-    TCM.begin(57600);
-#endif
-
-#endif
+    Transceiver.begin();
     
     Serial.begin(19200);
     pinMode(LED_BUILTIN, OUTPUT);
 
     
-#ifdef USE_IMPROV
     improvSerial.setDeviceInfo(
 #if defined(CONFIG_IDF_TARGET_ESP32C3)
 	ImprovTypes::ChipFamily::CF_ESP32_C3,
@@ -188,21 +176,20 @@ void setup(void) {
 
     improvSerial.onImprovConnected(onImprovWiFiConnectedCb);
     improvSerial.setCustomConnectWiFi(ImprovWiFiTryConnect);
-#endif
 
-#ifdef TCP_SVR_PORT
     webserver.on("/", HTTP_GET, homepage);    
     webserver.onNotFound(homepage);
+#ifdef OTA_URL    
+    webserver.on("/update", HTTP_GET, webupdate);    
 #endif
-
    
     Serial.print( WiFi.getHostname() );
     Serial.print(" - init succeed - running: ");
     Serial.print( VERSION );
+    Serial.print(" @ ");
+    Serial.print( getCpuFrequencyMhz() );
+    Serial.println(" MHz");
 
-    Serial.println();
-    
-    
 }
 
 unsigned long previousMillis  = 0;
@@ -217,20 +204,25 @@ void loop() {
     uint16_t av;
     
     unsigned long currentMillis = millis();
-    
-#ifdef RF_RESET
-    digitalWrite(RF_RESET, HIGH);
-#endif
-    
-#ifdef TCP_SVR_PORT
-    
+
     if (improvSerial.isConnected()) {
 
 	previousConnect = currentMillis;
 
+#ifdef OTA_URL
+	if (request_update) {
+	    firmwareUpdate();
+	    request_update = false;
+	}
+#endif
+
 	if (!Server_running) {
-	    Serial.print( "Server listening @ " + WiFi.localIP().toString() );
-	    Serial.println( ":" + String(TCP_SVR_PORT) );
+	    Serial.println( "Server listening @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT));
+#ifdef OTA_URL
+	    Serial.println("This firmware supports OTA updates, by calling: http://" + WiFi.localIP().toString() + "/update?t=99");
+#else	    
+	    Serial.println("No OTA support");
+#endif
 	    
 	    server.begin();
 	    server.setNoDelay(true);
@@ -242,6 +234,8 @@ void loop() {
 	    MDNS.addService( "http", "tcp", 80);
 
 	    Server_running = true;
+	    Transceiver.set_reset(false);
+	
 	}
 
 	//check if there are any new clients
@@ -268,7 +262,7 @@ void loop() {
 		    //get data from the telnet client and push it to the UART
 		    if (av > MAXBUF) av = MAXBUF;
 		    serverClients[i].readBytes( sbuf, av );
-		    TCM.write( sbuf, av ) ;
+		    Transceiver.write( sbuf, av ) ;
 		    BytesIn += av;
 		    digitalWrite(LED_BUILTIN, HIGH);
 		    previousMillis = currentMillis;
@@ -290,6 +284,7 @@ void loop() {
 	
 	if (Server_running) {
 	    Serial.println("WiFi disconnected!");
+	    Transceiver.set_reset(true);
 	    server.end();
 	    webserver.end();
 	    MDNS.end();
@@ -312,45 +307,20 @@ void loop() {
 	
     }
     
-#endif
-    
-#ifdef TCP_SVR_PORT
-#ifdef USE_IMPROV
     improvSerial.handleSerial();
-#endif	
-#else
-    av = Serial.available();
-    if (av > 0) {
-	
-	if (av > MAXBUF) av = MAXBUF;
-	Serial.readBytes( sbuf, av );
-	BytesIn += av;
-	
-#ifdef USE_IMPROV
-	if (!improvSerial.handleBuffer(sbuf, av) )
-#endif	
-	    TCM.write( sbuf, av );
-	digitalWrite(LED_BUILTIN, HIGH);
-	previousMillis = currentMillis;
-    }
-#endif
 
-    av = TCM.available();
+    av = Transceiver.available();
     if (av > 0) {
 	if (av > MAXBUF) av = MAXBUF;
-	TCM.readBytes( sbuf, av );
+	Transceiver.readBytes( sbuf, av );
 	BytesOut += av;
 
-#ifdef TCP_SVR_PORT
 	for(i = 0; i < MAX_SRV_CLIENTS; i++){
 	    if (serverClients[i] && serverClients[i].connected()){
 		serverClients[i].write(sbuf, av);
 		delay(1);
 	    }
 	}
-#else
-	Serial.write( sbuf, av ) ;
-#endif    
 	digitalWrite(LED_BUILTIN, HIGH);
 	previousMillis = currentMillis;
     }
