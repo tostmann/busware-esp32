@@ -63,6 +63,7 @@ bool Server_running = false;
 unsigned long previousConnect = 0;
 const long Reconnect_interval = 5000;
 bool request_update = false;
+bool request_restart = false;
 
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
@@ -71,7 +72,27 @@ bool request_update = false;
 AsyncWebServer webserver(80);
 
 void homepage(AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", String( WiFi.getHostname() ) + " - Version: " + VERSION + "\n\nSSID: " + WiFi.SSID() + " - RSSI: " + WiFi.RSSI() + "dBm - uptime: " + String(millis()/1000)+ "sec - Bytes in: " + String(BytesIn) + " out: " + String(BytesOut) + "\n\nTCP bridge active @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT) + "\n\n"  );
+    AsyncResponseStream *response = request->beginResponseStream("text/plain");
+
+//    AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", String( WiFi.getHostname() ) + " - Version: " + VERSION + "\n\nSSID: " + WiFi.SSID() + " - RSSI: " + WiFi.RSSI() + "dBm - uptime: " + String(millis()/1000)+ "sec - Bytes in: " + String(BytesIn) + " out: " + String(BytesOut) + "\n\nTCP bridge active @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT) + "\n\n"  );
+    response->print( String( WiFi.getHostname() ) + " - Version: " + VERSION + "\n\nSSID: " + WiFi.SSID() + " - RSSI: " + WiFi.RSSI() + "dBm - uptime: " + String(millis()/1000)+ "sec - Bytes in: " + String(BytesIn) + " out: " + String(BytesOut) + "\n\nTCP bridge active @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT) + "\n\n"  );
+    response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    response->addHeader("Pragma", "no-cache");
+    response->addHeader("Expires", "0");
+    
+    for(uint8_t i = 0; i < MAX_SRV_CLIENTS; i++){
+	if (serverClients[i] && serverClients[i].connected()){
+	    response->printf("Client %d from: ", i+1);
+	    response->print( serverClients[i].remoteIP().toString() );
+	    response->printf(":%d\n", serverClients[i].remotePort() );
+	}
+    }
+    request->send(response);
+}
+
+void restart(AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", String( "restarting...\n\n" ));
+    request_restart = true;
 }
 
 #ifdef OTA_URL
@@ -154,9 +175,9 @@ bool ImprovWiFiTryConnect(const char *ssid, const char *password) {
 }
 
 void setup(void) {
+    
+    String UniqueName = String(MYNAME) + "-" + getBase32ID();
 
-    String UniqueName = String(MYNAME) + "-" + WiFi.macAddress();
-    UniqueName.replace( ":", "" );				   
     WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
     WiFi.setHostname( UniqueName.c_str() );
 
@@ -164,7 +185,6 @@ void setup(void) {
     
     Serial.begin(19200);
     pinMode(LED_BUILTIN, OUTPUT);
-
     
     improvSerial.setDeviceInfo(
 #if defined(CONFIG_IDF_TARGET_ESP32C3)
@@ -178,6 +198,8 @@ void setup(void) {
     improvSerial.setCustomConnectWiFi(ImprovWiFiTryConnect);
 
     webserver.on("/", HTTP_GET, homepage);    
+    webserver.on("/reboot", HTTP_GET, restart);    
+    webserver.on("/restart", HTTP_GET, restart);    
     webserver.onNotFound(homepage);
 #ifdef OTA_URL    
     webserver.on("/update", HTTP_GET, webupdate);    
@@ -205,6 +227,11 @@ void loop() {
     
     unsigned long currentMillis = millis();
 
+    if (request_restart) {
+	delay(1000);
+	ESP.restart();
+    }
+    
     if (improvSerial.isConnected()) {
 
 	previousConnect = currentMillis;

@@ -6,27 +6,29 @@
 #include <HTTPUpdate.h>
 
 void update_started() {
-  Serial.println("CALLBACK:  HTTP update process started");
+  Serial.println("HTTP update: process started");
 }
 
 void update_finished() {
-  Serial.println("CALLBACK:  HTTP update process finished");
+  Serial.println("HTTP update: process finished");
 }
 
 void update_progress(int cur, int total) {
-  Serial.printf("CALLBACK:  HTTP update process at %d of %d bytes...\n", cur, total);
+  Serial.printf("HTTP update: process at %d of %d bytes...\n", cur, total);
+  delay(1); yield();
 }
 
 void update_error(int err) {
-  Serial.printf("CALLBACK:  HTTP update fatal error code %d\n", err);
+  Serial.printf("HTTP update: fatal error code %d\n", err);
 }
 
 void firmwareUpdate() {
     WiFiClient client;
-
+    HTTPUpdate httpUpdate;
+    
     httpUpdate.onStart(update_started);
     httpUpdate.onEnd(update_finished);
-    //    httpUpdate.onProgress(update_progress);
+    httpUpdate.onProgress(update_progress);
     httpUpdate.onError(update_error);
     httpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);	    
     
