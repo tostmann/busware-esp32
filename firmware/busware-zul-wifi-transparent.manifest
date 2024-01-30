@@ -1,0 +1,18 @@
+{
+  "new_install_improv_wait_time": 10,
+  "funding_url": "https://paypal.me/busware",
+  "new_install_prompt_erase": true,
+  "name": "WiFi-bridge for RF2652R (ZUL)",
+  "builds": [
+    {
+      "chipFamily": "ESP32-C3",
+      "improv": true,
+      "parts": [
+        {
+          "path": "https://install.busware.de/firmware/busware-zul-c3-wifi-transparent.factory.bin",
+          "offset": 0
+        }
+      ]
+    }
+  ]
+}
