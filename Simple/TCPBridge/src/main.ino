@@ -18,10 +18,13 @@ ImprovWiFi improvSerial(&Serial);
 #define MAXBUF 1024
 #define MAX_SRV_CLIENTS 1
 
+#include <ESPmDNS.h>
+#include "mdns.h"
+
 // main definitions:
 #if defined(BUSWARE_EUL)
 
-#define MDNS_SRV "tcm515"
+#define MDNS_SRV "_tcm515"
 #define MYNAME "EUL"
 
 #if defined(CONFIG_IDF_TARGET_ESP32C3)
@@ -35,14 +38,22 @@ TCMTransceiver Transceiver(&Serial1, 21);
 TPUARTTransceiver Transceiver(&Serial0);
 
 #define MYNAME "TUL"
-#define MDNS_SRV "ncn5130"
+#define MDNS_SRV "_ncn5130"
+
+#elif defined(BUSWARE_ZUL)
+
+#define MYNAME "ZUL"
+#define MDNS_SRV "_zstack"
+#define MDNS_TXT_COUNT 2
+mdns_txt_item_t mDNSTxtData[MDNS_TXT_COUNT] = {{(char*)"radio_type", (char*)"zstack"}, {(char*)"baud_rate", (char*)"115200"}};
+ZigbeeTransceiver Transceiver(&Serial0, 3, 2);
 
 #elif defined(BUSWARE_CUN)
 
 CSMTransceiver Transceiver(&Serial0, 2);
 
 #define MYNAME "CUN"
-#define MDNS_SRV "culfw"
+#define MDNS_SRV "_culfw"
 
 #else
 
@@ -64,10 +75,11 @@ unsigned long previousConnect = 0;
 const long Reconnect_interval = 5000;
 bool request_update = false;
 bool request_restart = false;
+int8_t ledmode = 2;
+long led_interval = 100;
 
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-#include <ESPmDNS.h>
 
 AsyncWebServer webserver(80);
 
@@ -79,6 +91,20 @@ void homepage(AsyncWebServerRequest *request) {
     response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     response->addHeader("Pragma", "no-cache");
     response->addHeader("Expires", "0");
+
+    if (request->hasParam("ledmode")) {
+	String message = request->getParam("ledmode")->value();
+	int8_t mode = message.toInt();
+	if (mode != ledmode) {
+	    response->printf("new ledmode is: %d was %d\n\n", mode, ledmode);
+	    ledmode = mode;
+	    prefs.begin("credentials", false);
+	    prefs.putInt("ledmode", ledmode);
+	    prefs.end();
+	    if (ledmode)
+		led_interval = ledmode * 250;
+	}
+    }
     
     for(uint8_t i = 0; i < MAX_SRV_CLIENTS; i++){
 	if (serverClients[i] && serverClients[i].connected()){
@@ -218,7 +244,6 @@ unsigned long previousMillis  = 0;
 unsigned long ReqMillis = 0;
 
 int ledState = LOW;
-const long interval = 500;
 
 // the loop function runs over and over again forever
 void loop() {
@@ -257,9 +282,14 @@ void loop() {
 	    webserver.begin();
 
 	    MDNS.begin(WiFi.getHostname());
-	    MDNS.addService( MDNS_SRV, "tcp", TCP_SVR_PORT);
 	    MDNS.addService( "http", "tcp", 80);
 
+#ifdef MDNS_TXT_COUNT
+	    mdns_service_add(NULL, MDNS_SRV, "_tcp", TCP_SVR_PORT, mDNSTxtData, MDNS_TXT_COUNT);
+#else
+	    MDNS.addService( MDNS_SRV, "tcp", TCP_SVR_PORT);
+#endif
+		
 	    Server_running = true;
 	    Transceiver.set_reset(false);
 	
@@ -291,7 +321,8 @@ void loop() {
 		    serverClients[i].readBytes( sbuf, av );
 		    Transceiver.write( sbuf, av ) ;
 		    BytesIn += av;
-		    digitalWrite(LED_BUILTIN, HIGH);
+		    if (ledmode)
+			digitalWrite(LED_BUILTIN, LOW);
 		    previousMillis = currentMillis;
 		}
 	    }
@@ -323,11 +354,14 @@ void loop() {
 	    prefs.begin("credentials", true);
 	    String ssid     = prefs.getString("ssid", ""); 
 	    String password = prefs.getString("password", "");
+	    ledmode         = prefs.getInt("ledmode", 2);
 	    prefs.end();
 	    
 	    if (ssid != "" && password != "")
 		ImprovWiFiTryConnect(ssid.c_str(), password.c_str());
 
+	    if (ledmode)
+		led_interval = ledmode * 250;
 	    previousConnect = currentMillis;
 
 	}
@@ -348,15 +382,16 @@ void loop() {
 		delay(1);
 	    }
 	}
-	digitalWrite(LED_BUILTIN, HIGH);
+	if (ledmode)
+	    digitalWrite(LED_BUILTIN, LOW);
 	previousMillis = currentMillis;
     }
 
     // LED blinking
-    if (currentMillis - previousMillis >= interval) {
+    if (currentMillis - previousMillis >= led_interval) {
 	previousMillis = currentMillis;
 	
-	if (ledState == HIGH)
+	if (ledState == HIGH && ledmode>1)
 	    ledState = LOW;
 	else
 	    ledState = HIGH;

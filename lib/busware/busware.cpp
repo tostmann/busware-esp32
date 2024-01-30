@@ -26,6 +26,10 @@ String getBase32ID() {
 }
 
 void GenericTransceiver::begin() {
+   if (_bootloadPIN) {
+	pinMode(_bootloadPIN, OUTPUT);
+	digitalWrite(_bootloadPIN, HIGH);
+   }
     if (_resetPIN)
 	pinMode(_resetPIN, OUTPUT);
     set_reset( true );
@@ -34,6 +38,16 @@ void GenericTransceiver::begin() {
 void GenericTransceiver::set_reset(bool res) {
     if (_resetPIN) 
 	digitalWrite(_resetPIN, res ? LOW : HIGH );
+}
+
+void GenericTransceiver::call_bootloader(bool res) {
+    if (_bootloadPIN) {
+	digitalWrite(_bootloadPIN, res ? LOW : HIGH);
+	set_reset( true );
+	delay(100); 
+	set_reset( false );
+	delay(100); 
+    }
 }
 
 
@@ -56,3 +70,10 @@ void TCMTransceiver::begin() {
     } else
 	_serial->begin(57600);
 }
+
+void ZigbeeTransceiver::begin() {
+    GenericTransceiver::begin();
+    //    _serial->begin(500000, SERIAL_8N1);;
+    _serial->begin(115200, SERIAL_8N1);;
+}
+

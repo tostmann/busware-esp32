@@ -5,6 +5,7 @@
 
 #include "version.h"
 #include "busware.h"
+#include <WiFi.h>
 
 #ifdef USE_IMPROV
 #include <ImprovWiFiLibrary.h>
@@ -29,6 +30,11 @@ TCMTransceiver Transceiver(&Serial1, 21);
 #define MYNAME "TUL"
 TPUARTTransceiver Transceiver(&Serial0);
 
+#elif defined(BUSWARE_ZUL)
+
+#define MYNAME "ZUL"
+ZigbeeTransceiver Transceiver(&Serial0, 3, 2);
+
 #elif defined(BUSWARE_CUN)
 
 #define MYNAME "CUN"
@@ -45,8 +51,8 @@ byte smlMessage[MAXBUF]; // for storing the the isolated message.
 
 void setup(void) {
 
-    String UniqueName = String(MYNAME) + "-" + WiFi.macAddress();
-    UniqueName.replace( ":", "" );				   
+    String UniqueName = String(MYNAME) + "-" + getBase32ID();
+
     WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
     WiFi.setHostname( UniqueName.c_str() );
 
