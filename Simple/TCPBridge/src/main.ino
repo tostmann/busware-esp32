@@ -61,15 +61,10 @@ CSMTransceiver Transceiver(&Serial0, 2);
 
 #endif
 
-uint32_t BytesIn  = 0; 
-uint32_t BytesOut = 0;
-
 #ifndef TCP_SVR_PORT
 #error need TCP_SVR_PORT definition
 #endif
 
-WiFiServer server(TCP_SVR_PORT); // TCP Port to listen on 
-WiFiClient serverClients[MAX_SRV_CLIENTS];
 bool Server_running = false;
 unsigned long previousConnect = 0;
 const long Reconnect_interval = 5000;
@@ -77,20 +72,26 @@ bool request_update = false;
 bool request_restart = false;
 int8_t ledmode = 2;
 long led_interval = 100;
+unsigned long previousMillis  = 0;
+unsigned long ReqMillis = 0;
+
+int ledState = LOW;
 
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include <TCPBridge.h>
 
+TCPBridge Bridge(TCP_SVR_PORT, &Transceiver);
 AsyncWebServer webserver(80);
 
 void homepage(AsyncWebServerRequest *request) {
     AsyncResponseStream *response = request->beginResponseStream("text/plain");
 
-//    AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", String( WiFi.getHostname() ) + " - Version: " + VERSION + "\n\nSSID: " + WiFi.SSID() + " - RSSI: " + WiFi.RSSI() + "dBm - uptime: " + String(millis()/1000)+ "sec - Bytes in: " + String(BytesIn) + " out: " + String(BytesOut) + "\n\nTCP bridge active @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT) + "\n\n"  );
-    response->print( String( WiFi.getHostname() ) + " - Version: " + VERSION + "\n\nSSID: " + WiFi.SSID() + " - RSSI: " + WiFi.RSSI() + "dBm - uptime: " + String(millis()/1000)+ "sec - Bytes in: " + String(BytesIn) + " out: " + String(BytesOut) + "\n\nTCP bridge active @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT) + "\n\n"  );
     response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     response->addHeader("Pragma", "no-cache");
     response->addHeader("Expires", "0");
+
+    response->print( String( WiFi.getHostname() ) + " - Version: " + VERSION + "\n\nSSID: " + WiFi.SSID() + " - RSSI: " + WiFi.RSSI() + "dBm - uptime: " + String(millis()/1000)+ "sec - Bytes in: " + String(Bridge.BytesIn) + " out: " + String(Bridge.BytesOut) + "\n\nTCP bridge active @ " + WiFi.localIP().toString() + ":" + String(TCP_SVR_PORT) + "\n\n"  );
 
     if (request->hasParam("ledmode")) {
 	String message = request->getParam("ledmode")->value();
@@ -105,14 +106,15 @@ void homepage(AsyncWebServerRequest *request) {
 		led_interval = ledmode * 250;
 	}
     }
-    
-    for(uint8_t i = 0; i < MAX_SRV_CLIENTS; i++){
-	if (serverClients[i] && serverClients[i].connected()){
+
+    for(uint8_t i = 0; i < Bridge.maxclients; i++){
+	if (Bridge.clients[i] && Bridge.clients[i]->connected()){
 	    response->printf("Client %d from: ", i+1);
-	    response->print( serverClients[i].remoteIP().toString() );
-	    response->printf(":%d\n", serverClients[i].remotePort() );
+	    response->print( Bridge.clients[i]->remoteIP().toString() );
+	    response->printf(":%d\n", Bridge.clients[i]->remotePort() );
 	}
     }
+
     request->send(response);
 }
 
@@ -131,9 +133,6 @@ void webupdate(AsyncWebServerRequest *request) {
     request_update = true;
 }
 #endif
-
-uint16_t inByte; // for reading from serial
-byte smlMessage[MAXBUF]; // for storing the the isolated message. 
 
 void onImprovWiFiConnectedCb(const char *ssid, const char *password) {
     prefs.begin("credentials", false);
@@ -186,6 +185,7 @@ bool ImprovWiFiTryConnect(const char *ssid, const char *password) {
     if (!known) 
 	return false;
     
+    WiFi.mode(WIFI_STA);
     WiFi.begin( ssid, password, bestChannel, bestBSSID);
     
     while (!WiFi.isConnected()) {
@@ -200,6 +200,7 @@ bool ImprovWiFiTryConnect(const char *ssid, const char *password) {
     return true;
 }
 
+
 void setup(void) {
     
     String UniqueName = String(MYNAME) + "-" + getBase32ID();
@@ -208,7 +209,7 @@ void setup(void) {
     WiFi.setHostname( UniqueName.c_str() );
 
     Transceiver.begin();
-    
+
     Serial.begin(19200);
     pinMode(LED_BUILTIN, OUTPUT);
     
@@ -240,16 +241,8 @@ void setup(void) {
 
 }
 
-unsigned long previousMillis  = 0;
-unsigned long ReqMillis = 0;
-
-int ledState = LOW;
-
 // the loop function runs over and over again forever
 void loop() {
-    uint8_t sbuf[MAXBUF], i;
-    uint16_t av;
-    
     unsigned long currentMillis = millis();
 
     if (request_restart) {
@@ -276,8 +269,7 @@ void loop() {
 	    Serial.println("No OTA support");
 #endif
 	    
-	    server.begin();
-	    server.setNoDelay(true);
+	    Bridge.begin();
 
 	    webserver.begin();
 
@@ -295,55 +287,13 @@ void loop() {
 	
 	}
 
-	//check if there are any new clients
-	if (server.hasClient()){
-	    for(i = 0; i < MAX_SRV_CLIENTS; i++){
-		//find free/disconnected spot
-		if (!serverClients[i] || !serverClients[i].connected()){
-		    if(serverClients[i]) serverClients[i].stop();
-		    serverClients[i] = server.available();
-		    break;
-		}
-	    }
-	    
-	    if (i >= MAX_SRV_CLIENTS) {
-		//no free/disconnected spot so reject
-		server.available().stop();
-	    }
-	}
-	//check clients for data
-	for(i = 0; i < MAX_SRV_CLIENTS; i++){
-	    if (serverClients[i] && serverClients[i].connected()){
-		av = serverClients[i].available();
-		if(av > 0 ){
-		    //get data from the telnet client and push it to the UART
-		    if (av > MAXBUF) av = MAXBUF;
-		    serverClients[i].readBytes( sbuf, av );
-		    Transceiver.write( sbuf, av ) ;
-		    BytesIn += av;
-		    if (ledmode)
-			digitalWrite(LED_BUILTIN, LOW);
-		    previousMillis = currentMillis;
-		}
-	    }
-	    else {
-		if (serverClients[i]) {
-		    serverClients[i].stop();
-		}
-	    }
-	}
-
     } else {
 	
-	
-	for(i = 0; i < MAX_SRV_CLIENTS; i++) {
-	    if (serverClients[i]) serverClients[i].stop();
-	}
 	
 	if (Server_running) {
 	    Serial.println("WiFi disconnected!");
 	    Transceiver.set_reset(true);
-	    server.end();
+	    Bridge.end();
 	    webserver.end();
 	    MDNS.end();
 	    Server_running = false;
@@ -369,23 +319,7 @@ void loop() {
     }
     
     improvSerial.handleSerial();
-
-    av = Transceiver.available();
-    if (av > 0) {
-	if (av > MAXBUF) av = MAXBUF;
-	Transceiver.readBytes( sbuf, av );
-	BytesOut += av;
-
-	for(i = 0; i < MAX_SRV_CLIENTS; i++){
-	    if (serverClients[i] && serverClients[i].connected()){
-		serverClients[i].write(sbuf, av);
-		delay(1);
-	    }
-	}
-	if (ledmode)
-	    digitalWrite(LED_BUILTIN, LOW);
-	previousMillis = currentMillis;
-    }
+    Bridge.loop();
 
     // LED blinking
     if (currentMillis - previousMillis >= led_interval) {
