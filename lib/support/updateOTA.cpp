@@ -14,12 +14,11 @@ void update_finished() {
 }
 
 void update_progress(int cur, int total) {
-  Serial.printf("HTTP update: process at %d of %d bytes...\n", cur, total);
-  delay(1); yield();
+  Serial.printf("HTTP update: process at %d of %d bytes...\r\n", cur, total);
 }
 
 void update_error(int err) {
-  Serial.printf("HTTP update: fatal error code %d\n", err);
+  Serial.printf("HTTP update: fatal error code %d\r\n", err);
 }
 
 void firmwareUpdate() {
@@ -46,7 +45,7 @@ void firmwareUpdate() {
     
     switch (ret) {
     case HTTP_UPDATE_FAILED:
-	Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+	Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\r\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
 	break;
 	
     case HTTP_UPDATE_NO_UPDATES:
