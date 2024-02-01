@@ -7,7 +7,7 @@
 #include "delay.h"
 #include "fncollection.h"
 #include "cc1100.h"
-#include "../version.h"
+#include "version.h"
 #ifdef HAS_USB
 #include <Drivers/USB/USB.h>
 #endif

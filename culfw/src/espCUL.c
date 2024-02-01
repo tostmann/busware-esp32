@@ -62,14 +62,6 @@
 #include "rf_zwave.h"
 #endif
 
-
-
-#ifdef HAS_CC1100_433
-const uint8_t mark433_pin = 0x00;
-#else
-const uint8_t mark433_pin = 0xff;
-#endif
-
 const PROGMEM t_fntab fntab[] = {
 
 #ifdef HAS_ASKSIN
@@ -148,8 +140,8 @@ main(void)
   wdt_disable();
   clock_prescale_set(clock_div_1);
 
-//  LED_ON_DDR  |= _BV( LED_ON_PIN );
-//  LED_ON_PORT |= _BV( LED_ON_PIN );
+  MARK433_PORT |= _BV( MARK433_BIT ); // Pull 433MHz marker
+  MARK915_PORT |= _BV( MARK915_BIT ); // Pull 915MHz marker
 
   led_init();
   LED_ON();

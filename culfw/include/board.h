@@ -3,13 +3,6 @@
 
 #include <stdint.h>
 
-/* if you have an Arduino with only 8MHz disable the next line */
-//#define HAS_16MHZ_CLOCK
-
-/* if you are using a CC1101 module for 868MHz disable the next line */
-//#define HAS_CC1100_433
-
-
 #define SPI_PORT		PORTB
 #define SPI_DDR			DDRB
 #define SPI_SS			2
@@ -54,20 +47,16 @@
 #define LED_PORT                PORTB
 #define LED_PIN                 1
 
-//#define LED_ON_DDR              DDRB
-//#define LED_ON_PORT             PORTB
-//#define LED_ON_PIN              1
-
-
 #define BOARD_ID_STR            "espCUL868"
 #define BOARD_ID_STR433         "espCUL433"
 
-/* define this device as a 433 MHz one */
-/* this isn't done like a CUL by reading a port pin but instead a fixed value of 0 for mark433_pin is used */ 
 #define MULTI_FREQ_DEVICE
-#define MARK433_PIN 			mark433_pin
-#define MARK433_BIT             0
-extern const uint8_t mark433_pin;
+#define MARK433_PORT            PORTD
+#define MARK433_PIN             PIND
+#define MARK433_BIT             4
+#define MARK915_PORT            PORTD
+#define MARK915_PIN             PIND
+#define MARK915_BIT             5
 
 #define HAS_UART
 #define UART_BAUD_RATE          38400
