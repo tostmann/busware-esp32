@@ -1,4 +1,5 @@
 {
+  "new_install_improv_wait_time": 10,
   "funding_url": "https://paypal.me/busware",
   "new_install_prompt_erase": true,
   "name": "Thelsing KNX-IP WiFi-Coupler for TUL",
