@@ -1,0 +1,17 @@
+{
+  "funding_url": "https://paypal.me/busware",
+  "new_install_prompt_erase": true,
+  "name": "Thelsing KNX-IP WiFi-Coupler for TUL",
+  "builds": [
+    {
+      "chipFamily": "ESP32-C3",
+      "improv": true,
+      "parts": [
+        {
+          "path": "https://install.busware.de/firmware/busware-tul-c3-thelsing-coupler.factory.bin",
+          "offset": 0
+        }
+      ]
+    }
+  ]
+}
