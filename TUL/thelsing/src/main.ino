@@ -41,6 +41,23 @@ void init_webserver() {
 	    htmlContent.replace("%version%", VERSION);
 	    htmlContent.replace("%freitext%", "setup multicast addr: 224.0.23.12 port: 3671 ip: %ip_address%");
 	    htmlContent.replace("%ip_address%", WiFi.localIP().toString());
+
+	    if (knx.bau().getSecondaryDataLinkLayer()) {
+		htmlContent.replace("%TxFrameCounter%", String( knx.bau().getSecondaryDataLinkLayer()->getTxFrameCounter(), DEC));
+		htmlContent.replace("%RxProcessdFrameCounter%", String( knx.bau().getSecondaryDataLinkLayer()->getRxProcessdFrameCounter(), DEC));
+		htmlContent.replace("%TxProcessedFrameCounter%", String( knx.bau().getSecondaryDataLinkLayer()->getTxProcessedFrameCounter(), DEC));
+
+		/*
+		  uint32_t getRxInvalidFrameCounter();
+		  uint32_t getRxIgnoredFrameCounter();
+		  uint32_t getRxUnknownControlCounter();
+		  uint32_t getTxProcessedFrameCounter();
+		*/
+	    }
+
+	    
+	    htmlContent.replace("%uptime%", String(millis()/60000, DEC));
+	    
 	    htmlFile.close();
     
 	    request->send(200, "text/html", htmlContent);
@@ -87,6 +104,7 @@ void onImprovWiFiConnectedCb(const char *ssid, const char *password) {
     // start the framework.
     knx.start();
 
+    
     init_webserver();
 }
 

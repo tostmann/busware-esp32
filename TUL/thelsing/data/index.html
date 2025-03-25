@@ -1,0 +1,152 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Systeminformationen</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --background: #f8fafc;
+            --card-bg: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, Roboto, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--background) 0%, #e2e8f0 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            display: block;
+            margin: 0 auto 1.5rem;
+            max-width: 150px;
+            height: auto;
+            transition: transform 0.2s ease;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--secondary-color);
+            margin-bottom: 2rem;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .info-label {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .info-value {
+            color: var(--secondary-color);
+            font-size: 1.2rem;
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        .freitext-section {
+            margin-top: 2rem;
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+            
+            .logo {
+                max-width: 120px;
+            }
+            
+            .card {
+                padding: 1.5rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="https://busser.io/img/busser.io.png" alt="System-Logo" class="logo">
+        <h1>🖥 Systemübersicht</h1>
+        
+        <div class="grid">
+            <div class="card">
+                <div class="info-label">Systemname</div>
+                <div class="info-value">%name%</div>
+            </div>
+            
+            <div class="card">
+                <div class="info-label">Prozessor ID</div>
+                <div class="info-value">%cpu_id%</div>
+            </div>
+            
+            <div class="card">
+                <div class="info-label">Softwareversion</div>
+                <div class="info-value">%version%</div>
+            </div>
+            
+            <div class="card">
+                <div class="info-label">IP-Adresse</div>
+                <div class="info-value">%ip_address%</div>
+            </div>
+
+            <div class="card">
+                <div class="info-label">Uptime</div>
+                <div class="info-value">%uptime% min</div>
+            </div>
+
+            <div class="card">
+                <div class="info-label">Processed Frames</div>
+                <div class="info-value">Tx: %TxProcessedFrameCounter% / Rx: %RxProcessdFrameCounter%</div>
+            </div>
+        </div>
+
+        <div class="freitext-section">
+            <div class="info-label">Systembeschreibung</div>
+            <div class="info-value">%freitext%</div>
+        </div>
+    </div>
+
+</body>
+</html>
