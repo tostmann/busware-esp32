@@ -39,9 +39,10 @@ void init_webserver() {
 	    htmlContent.replace("%name%", MYNAME);
 	    htmlContent.replace("%cpu_id%", WiFi.getHostname());
 	    htmlContent.replace("%version%", VERSION);
-	    htmlContent.replace("%freitext%", "setup multicast addr: 224.0.23.12 port: 3671 ip: %ip_address%");
+            htmlContent.replace("%freitext%", "setup multicast addr: 224.0.23.12 port: 3671 ip: %ip_address% tunnels: %num_tunnels%");
 	    htmlContent.replace("%ip_address%", WiFi.localIP().toString());
-
+            htmlContent.replace("%num_tunnels%", String(KNX_TUNNELING,DEC));
+	    
 	    if (knx.bau().getSecondaryDataLinkLayer()) {
 		htmlContent.replace("%TxFrameCounter%", String( knx.bau().getSecondaryDataLinkLayer()->getTxFrameCounter(), DEC));
 		htmlContent.replace("%RxProcessdFrameCounter%", String( knx.bau().getSecondaryDataLinkLayer()->getRxProcessdFrameCounter(), DEC));
@@ -75,7 +76,9 @@ void onImprovWiFiConnectedCb(const char *ssid, const char *password) {
 	prefs.putString("password", password);
 	prefs.end();
     }
-    
+
+    WiFi.setAutoReconnect(true);
+
     Serial.println(WiFi.localIP());
     
     Serial.println("Adjusting system time...");
@@ -104,7 +107,6 @@ void onImprovWiFiConnectedCb(const char *ssid, const char *password) {
     // start the framework.
     knx.start();
 
-    
     init_webserver();
 }
 
