@@ -12,6 +12,16 @@
           "offset": 0
         }
       ]
+    },
+    {
+      "chipFamily": "ESP32-C6",
+      "improv": false,
+      "parts": [
+        {
+          "path": "https://install.busware.de/firmware/busware-tul-c6-serial-transparent.factory.bin",
+          "offset": 0
+        }
+      ]
     }
   ]
 }
